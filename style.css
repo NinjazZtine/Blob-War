@@ -11,7 +11,7 @@
 
 #canvas {
     position: absolute;
-    background: #12123d;
+    background: hsl(240,54.4%,15.5%);
 }
 
 .startScreen {
@@ -63,6 +63,7 @@
     
 .restartScreen h1 {
     margin: 5px 20px 5px 20px;
+    text-align: center;
     font-size: 3em;
 }
 
@@ -76,6 +77,28 @@
     font-size: 1.5em;
 }
 
+.controlTip #top {
+    z-index: 2;
+    font-size: 1.3em;
+    position: absolute;
+    top: 20%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: white;
+}
+
+.controlTip #bottom {
+    z-index: 2;
+    font-size: 1.3em;
+    position: absolute;
+    bottom: 20%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: white;
+}
+
 
 .controlTip {
     visibility: hidden;
@@ -83,6 +106,7 @@
     z-index: 5;
     width: 100%;
     height: 100%;
+    transition: 100ms;
     
     .moveControlSurfaceTip {
         position: absolute;

@@ -2,30 +2,30 @@ const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
-let CanvasWidth = 1000;
-let CanvasHeight = 800;
+let WorldWidth = 1500;
+let WorldHeight = 1000;
 let WindowWidth = window.innerWidth;
 let WindowHeight = window.innerHeight;
 
-const button_click = document.getElementById('button_click');
-const shoot = document.getElementById('shoot');
-const no_ammo = document.getElementById('no_ammo');
-const reload = document.getElementById('reload');
-const enemy_death = document.getElementById('enemy_death');
-const seeking_projectile_launch = document.getElementById('seeking_projectile_launch');
-const bullet_impact = document.getElementById('bullet_impact');
-const death_explosion = document.getElementById('death_explosion');
-const actx = new AudioContext();
+const button_click = document.getElementById("button_click");
+const shoot = document.getElementById("shoot");
+const no_ammo = document.getElementById("no_ammo");
+const reload = document.getElementById("reload");
+const enemy_death = document.getElementById("enemy_death");
+const seeking_projectile_launch = document.getElementById(
+    "seeking_projectile_launch"
+);
+const bullet_impact = document.getElementById("bullet_impact");
+const death_explosion = document.getElementById("death_explosion");
 
 const bgImage = document.getElementById("bg");
-
+const controlTip = document.querySelector(".controlTip");
 const startScreen = document.querySelector(".startScreen");
 const restartScreen = document.querySelector(".restartScreen");
 const restartScreenScore = document.getElementById("score");
 const restartScreenHighScore = document.getElementById("highscore");
 const startBtn = document.querySelector(".startBtn");
 const restartBtn = document.querySelector(".restartBtn");
-
 const statusContainer = document.querySelector(".statusContainer");
 const ScoreUi = document.getElementById("scoreUi");
 const HighScoreUi = document.getElementById("highScoreUi");
@@ -53,6 +53,7 @@ class Player {
         this.targetX = 1;
         this.targetY = 0;
         this.onFireCooldown = false;
+        this.onFireCooldownSmart = false;
         this.isDead = false;
     }
 
@@ -61,14 +62,14 @@ class Player {
         this.targetX = Math.cos(this.targetAngle);
         this.targetY = Math.sin(this.targetAngle);
     }
-    
+
     knock(velX, velY) {
         if (this.isDead) return;
         this.knockVelX += velX;
         this.knockVelY += velY;
         this.hurtFrames = 5;
     }
-    
+
     move(velX, velY) {
         if (this.isDead) return;
         this.moving = true;
@@ -84,20 +85,18 @@ class Player {
                 const velY = this.targetY * (Math.random() * 2 - 1 + 10);
                 const x = this.x + this.targetX * 20;
                 const y = this.y + this.targetY * 20;
-                
                 playAudio(shoot, 0.2);
-                
                 projectileArray.push(new Projectile(x, y, velX, velY));
                 this.ammo--;
-                AmmoUi.style.width = this.ammo / 50 * 100 + "%";
+                AmmoUi.style.width = (this.ammo / 50) * 100 + "%";
                 this.onFireCooldown = true;
             } else {
                 playAudio(no_ammo, 0.2);
                 if (!this.reloading) {
-                    this.reloading = true
+                    this.reloading = true;
                     setTimeout(() => {
                         playAudio(reload, 0.8);
-                        this.ammo = 50
+                        this.ammo = 50;
                         this.reloading = false;
                     }, 2000);
                 }
@@ -105,7 +104,22 @@ class Player {
             }
         }
     }
-    
+
+    fireSmartProjectile() {
+        if (!this.onFireCooldownSmart) {
+            if (Math.random() < 0.7) {
+                const i = Math.floor(Math.random() * enemyArray.length) - 1;
+                const target = enemyArray[i];
+                if (!target) return;
+                playAudio(seeking_projectile_launch, 0.1);
+                smartProjectileArray.push(
+                    new SmartProjectile(this.x, this.y, enemyArray[i], this.color)
+                );
+            }
+            this.onFireCooldownSmart = true;
+        }
+    }
+
     draw() {
         if (this.isDead) return;
         ctx.fillStyle = this.color;
@@ -123,15 +137,18 @@ class Player {
         ctx.lineWidth = this.size * 0.5;
         ctx.strokeStyle = "white";
         ctx.moveTo(this.x, this.y);
-        ctx.lineTo(this.x + this.targetX * (this.size * 1.7), this.y + this.targetY * (this.size * 1.7));
+        ctx.lineTo(
+            this.x + this.targetX * (this.size * 1.7),
+            this.y + this.targetY * (this.size * 1.7)
+        );
         ctx.stroke();
     }
 
     update() {
         if (!this.moving) {
             if (Math.abs(this.velX) + Math.abs(this.velY) > 0.001) {
-                this.velX *= 0.90;
-                this.velY *= 0.90;
+                this.velX *= 0.9;
+                this.velY *= 0.9;
             } else {
                 this.velX = 0;
                 this.velY = 0;
@@ -146,22 +163,22 @@ class Player {
         }
         this.x += this.velX + this.knockVelX;
         this.y += this.velY + this.knockVelY;
-        
 
-        if (this.x + this.size > CanvasWidth) {
-            this.x = CanvasWidth - this.size;
+        if (this.x + this.size > WorldWidth) {
+            this.x = WorldWidth - this.size;
         } else if (this.x - this.size < 0) {
             this.x = this.size;
         }
-        if (this.y + this.size > CanvasHeight) {
-            this.y = CanvasHeight - this.size;
+        if (this.y + this.size > WorldHeight) {
+            this.y = WorldHeight - this.size;
         } else if (this.y - this.size < 0) {
             this.y = this.size;
         }
-        
+
         if (aimControl.isActive && aimControl.power > 0.6) {
             this.fireProjectile();
         }
+        this.fireSmartProjectile();
         this.draw();
     }
 }
@@ -195,14 +212,13 @@ class Enemy {
         this.targetX = Math.cos(this.targetAngle);
         this.targetY = Math.sin(this.targetAngle);
     }
-    
+
     knock(velX, velY) {
         this.knockVelX += velX;
         this.knockVelY += velY;
         this.hurtFrames = 5;
     }
-    
-    
+
     fireProjectile() {
         if (!this.onFireCooldown) {
             if (Math.random() < 0.05) {
@@ -210,56 +226,64 @@ class Enemy {
                 const velY = this.targetY * 4;
                 const x = this.x + this.targetX * 30;
                 const y = this.y + this.targetY * 30;
-                beep(0.02, 10, 5);
+                playAudio(shoot, 0.05);
                 projectileArray.push(new Projectile(x, y, velX, velY, "red"));
             }
             this.onFireCooldown = true;
         }
     }
-    
+
     fireSmartProjectile(target) {
-        if (smartProjectileArray.length > 6) return
+        if (smartProjectileArray.length > 6) return;
         if (!this.onFireCooldownSmart) {
             if (Math.random() < 0.2) {
-                playAudio(seeking_projectile_launch, Math.random() * 0.02 + 0.01);
-                smartProjectileArray.push(new SmartProjectile(this.x, this.y, target, this.color));
+                playAudio(
+                    seeking_projectile_launch,
+                    Math.random() * 0.02 + 0.01
+                );
+                smartProjectileArray.push(
+                    new SmartProjectile(this.x, this.y, target, this.color)
+                );
             }
             this.onFireCooldownSmart = true;
         }
     }
-    
+
     draw() {
         ctx.fillStyle = this.color;
-        
+
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
         ctx.fill();
-        
+
         if (this.hurtFrames > 0) {
             ctx.fillStyle = this.hurtColor;
             ctx.fill();
             this.hurtFrames--;
         }
-        
+
         ctx.beginPath();
         ctx.lineWidth = this.size * 0.5;
         ctx.strokeStyle = "white";
         ctx.moveTo(this.x, this.y);
-        ctx.lineTo(this.x + this.targetX * (this.size * 1.7), this.y + this.targetY * (this.size * 1.7));
+        ctx.lineTo(
+            this.x + this.targetX * (this.size * 1.7),
+            this.y + this.targetY * (this.size * 1.7)
+        );
         ctx.stroke();
-        
+
         if (this.showHealth) {
             const barLength = this.size * 2.5 + 2;
-            const barX = this.x - barLength*0.5;
+            const barX = this.x - barLength * 0.5;
             const barY = this.y - (this.size + 18);
             ctx.fillStyle = "red";
-            ctx.fillRect(barX, barY, Math.max(0, (this.health * 2.5)), 6);
+            ctx.fillRect(barX, barY, Math.max(0, this.health * 2.5), 6);
             ctx.strokeStyle = "#a3a3a3";
             ctx.lineWidth = 1;
             ctx.strokeRect(barX, barY, barLength, 6);
         }
     }
-    
+
     update() {
         if (Math.abs(this.knockVelX) + Math.abs(this.knockVelY) > 0.001) {
             this.knockVelX *= 0.95;
@@ -271,24 +295,23 @@ class Enemy {
         this.x += this.velX + this.knockVelX;
         this.y += this.velY + this.knockVelY;
         this.aim(player);
-        
-        if (this.x + this.size > CanvasWidth) {
+
+        if (this.x + this.size > WorldWidth) {
             this.velX = -this.velX;
-            this.knockVelX = - this.knockVelX;
+            this.knockVelX = -this.knockVelX;
         } else if (this.x - this.size < 0) {
             this.velX = -this.velX;
-            this.knockVelX = - this.knockVelX;
+            this.knockVelX = -this.knockVelX;
         }
-        
-        if (this.y + this.size > CanvasHeight) {
+
+        if (this.y + this.size > WorldHeight) {
             this.velY = -this.velY;
-            this.knockVelY = - this.knockVelY;
+            this.knockVelY = -this.knockVelY;
         } else if (this.y - this.size < 0) {
             this.velY = -this.velY;
-            this.knockVelY = - this.knockVelY;
+            this.knockVelY = -this.knockVelY;
         }
-        
-        
+
         this.fireProjectile();
         this.fireSmartProjectile(player);
         if (this.isDead) {
@@ -302,10 +325,14 @@ class Enemy {
 }
 
 class SmartProjectile {
-    constructor(x, y, target, color = "red",
-    initialTargetX = Math.random() * CanvasWidth,
-    initialTargetY = Math.random() * CanvasHeight)
-    {
+    constructor(
+        x,
+        y,
+        target,
+        color = "red",
+        initialTargetX = Math.random() * WorldWidth,
+        initialTargetY = Math.random() * WorldHeight
+    ) {
         this.x = x;
         this.y = y;
         this.target = target;
@@ -315,20 +342,34 @@ class SmartProjectile {
         this.finalTargetY = this.target.y;
         this.velX = 0;
         this.velY = 0;
+        this.heading = 0;
         this.color = color;
-        this.size = 5;
+        this.size = 6;
         this.lifeTime = 15; //seconds
         this.markedForDeletion = false;
     }
-    
+
     draw() {
         ctx.fillStyle = this.color;
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.heading);
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.moveTo(0, 0);
+        ctx.lineTo(-this.size * 2.4, -this.size);
+        ctx.lineTo(-this.size * 1.8, 0);
+        ctx.lineTo(-this.size * 2.4, this.size);
+        ctx.lineTo(0, 0);
         ctx.fill();
+        ctx.restore();
     }
 
     update() {
+        
+        if (this.target.isDead) {
+            this.markedForDeletion = true;
+        }
+        
         this.finalTargetX = this.target.x;
         this.finalTargetY = this.target.y;
         const dx = Math.abs(this.finalTargetX - this.targetX) + 100;
@@ -351,6 +392,7 @@ class SmartProjectile {
         this.velY = Math.sin(angle) * 1.8;
         this.x += this.velX;
         this.y += this.velY;
+        this.heading = Math.atan2(this.velY, this.velX);
         this.draw();
     }
 }
@@ -390,7 +432,7 @@ class Particle {
         this.color = color;
         this.markedForDeletion = false;
     }
-    
+
     draw() {
         ctx.fillStyle = this.color;
         ctx.fillRect(
@@ -400,7 +442,7 @@ class Particle {
             this.size
         );
     }
-    
+
     update() {
         this.x += this.xVel;
         this.y += this.yVel;
@@ -528,8 +570,8 @@ function createEnemy() {
             size = big;
             break;
     }
-    const x = Math.round(size + Math.random() * (CanvasWidth - size * 2));
-    const y = Math.round(size + Math.random() * (CanvasHeight - size * 2));
+    const x = Math.round(size + Math.random() * (WorldWidth - size * 2));
+    const y = Math.round(size + Math.random() * (WorldHeight - size * 2));
     const angle = Math.atan2(player.y - y, player.x - x);
     const randomVel = Math.random() * 1 + 0.3;
     const xVel = Math.cos(angle) * randomVel;
@@ -538,7 +580,7 @@ function createEnemy() {
     enemyArray.push(new Enemy(x, y, xVel, yVel, size, color));
 }
 
-function emitParticle(x, y, multiplier, speed = multiplier, color = "white", xVelOffset = 0, yVelOffset = 0) {
+function emitParticle(x, y, multiplier, speed = multiplier, color = "white", xVelOffset = 0, yVelOffset = 0) { 
     for (i = 0; i < multiplier; i++) {
         particleArray.push(
             new Particle(x, y, color, speed, xVelOffset, yVelOffset)
@@ -552,40 +594,28 @@ function playAudio(audio, volume = 1) {
     audio.play();
 }
 
-function beep(vol, freq, duration) {
-    v = actx.createOscillator();
-    u = actx.createGain();
-    v.connect(u);
-    v.frequency.value = freq + 500;
-    v.type = "square";
-    u.connect(actx.destination);
-    u.gain.value = vol;
-    v.start(actx.currentTime);
-    v.stop(actx.currentTime + duration * 0.001);
-}
-
 function drawGrid() {
-    width = CanvasWidth / gridSize;
-    height = CanvasHeight / gridSize;
+    width = WorldWidth / gridSize;
+    height = WorldHeight / gridSize;
     ctx.shadowBlur = 0;
     ctx.strokeStyle = "white";
     ctx.lineWidth = 0.2;
     for (i = 0; i < width; i++) {
         ctx.beginPath();
         ctx.moveTo(i * gridSize, 0);
-        ctx.lineTo(i * gridSize, CanvasHeight);
+        ctx.lineTo(i * gridSize, WorldHeight);
         ctx.stroke();
     }
     for (i = 0; i < height; i++) {
         ctx.beginPath();
         ctx.moveTo(0, i * gridSize);
-        ctx.lineTo(CanvasWidth, i * gridSize);
+        ctx.lineTo(WorldWidth, i * gridSize);
         ctx.stroke();
     }
 }
 
 function drawBg() {
-    ctx.drawImage(bgImage, 0, 0, CanvasWidth, CanvasHeight);
+    ctx.drawImage(bgImage, 0, 0, WorldWidth, WorldHeight);
 }
 
 function kill() {
@@ -600,8 +630,8 @@ function kill() {
 
 function gameStart() {
     player = new Player(
-        Math.floor(Math.random() * CanvasWidth),
-        Math.floor(Math.random() * CanvasHeight),
+        Math.floor(Math.random() * WorldWidth),
+        Math.floor(Math.random() * WorldHeight),
         15,
         "hsl(0,0%,66.8%)"
     );
@@ -611,22 +641,25 @@ function gameStart() {
     ScoreUi.innerText = String(score);
     HealthUi.style.width = Math.max(2, player.health) + "%";
     AmmoUi.style.width = Math.max(2, (player.ammo / 50) * 100) + "%";
-    
+
     Timers = [
         //enemySpawnRate
         new Timer(1000, createEnemy),
+        
         //playerFireCooldown
         new Timer(150, () => {
             player.onFireCooldown = false;
         }),
-
+        new Timer(2000, () => {
+            player.onFireCooldownSmart = false;
+        }),
         //enemyFireCooldown
         new Timer(200, () => {
             enemyArray.forEach((enemy) => {
                 enemy.onFireCooldown = false;
             });
         }),
-        new Timer(2000, () => {
+        new Timer(5000, () => {
             enemyArray.forEach((enemy) => {
                 enemy.onFireCooldownSmart = false;
             });
@@ -641,8 +674,6 @@ function gameStart() {
 
         //fps counter
         new Timer(200, () => {
-            ctx.fillStyle = "white";
-            ctx.textAlign = "right";
             fps = Math.round(1000 / timeElapsed) + " FPS";
         }),
     ];
@@ -655,6 +686,8 @@ function gameStart() {
     restartScreen.style.visibility = "hidden";
     restartScreen.style.opacity = 0;
     statusContainer.style.visibility = "visible";
+    controlTip.style.opacity = 1;
+    controlTip.style.visibility = "visible";
     requestAnimationFrame(gameLoop);
 }
 
@@ -673,7 +706,6 @@ function gameOver() {
     restartScreenHighScore.innerText = String(highScore);
     restartScreen.style.visibility = "visible";
     restartScreen.style.opacity = 1;
-    
 }
 
 //SETUP
@@ -698,13 +730,15 @@ let running = false;
 function gameLoop(delta) {
     if (!running) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+    //ctx.fillStyle = "hsla(240,54.4%,15.5%,0.5)"
+    //ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
     camera.preRender();
-    drawBg();
+    
     drawGrid();
     ctx.lineWidth = 2;
     ctx.strokeStyle = "white";
-    ctx.strokeRect(0, 0, CanvasWidth, CanvasHeight);
+    ctx.strokeRect(0, 0, WorldWidth, WorldHeight);
     player.update();
 
     //Projectile Loop
@@ -713,9 +747,9 @@ function gameLoop(delta) {
         projectile.update();
         //enemyPassedBorder
         if (
-            projectile.x >= CanvasWidth ||
+            projectile.x >= WorldWidth ||
             projectile.x <= 0 ||
-            projectile.y >= CanvasHeight ||
+            projectile.y >= WorldHeight ||
             projectile.y <= 0
         ) {
             projectile.markedForDeletion = true;
@@ -748,7 +782,9 @@ function gameLoop(delta) {
                             enemy.showHealth = false;
                             enemy.isDead = true;
                             playAudio(enemy_death, 0.5);
-                            score += Math.round(Math.random() * 10 + enemy.origSize);
+                            score += Math.round(
+                                Math.random() * 10 + enemy.origSize
+                            );
                             ScoreUi.innerText = String(score);
                         }
                     }
@@ -763,19 +799,20 @@ function gameLoop(delta) {
         if (projectile.color === "white") {
             for (let j = 0; j < smartProjectileArray.length; j++) {
                 const sprojectile = smartProjectileArray[j];
-                const distance = Math.hypot(
-                    projectile.x - sprojectile.x,
-                    projectile.y - sprojectile.y
-                );
-                const radiiSum = sprojectile.size + projectile.size;
-                if (distance <= radiiSum) {
-                    sprojectile.markedForDeletion = true;
-                    projectile.markedForDeletion = true;
+                if (sprojectile.color !== player.color) {
+                    const distance = Math.hypot(
+                        projectile.x - sprojectile.x,
+                        projectile.y - sprojectile.y
+                    );
+                    const radiiSum = sprojectile.size + projectile.size;
+                    if (distance <= radiiSum) {
+                        sprojectile.markedForDeletion = true;
+                        projectile.markedForDeletion = true;
+                    }
                 }
             }
         }
-        
-        
+
         //Player and Projectile Collision
         if (projectile.color === "red") {
             if (!player.isDead) {
@@ -805,7 +842,10 @@ function gameLoop(delta) {
                     );
                     if (player.health > 0) {
                         playAudio(bullet_impact, 0.1);
-                        player.knock(projectile.velX * 0.2, projectile.velY * 0.2);
+                        player.knock(
+                            projectile.velX * 0.2,
+                            projectile.velY * 0.2
+                        );
                         player.health -= Math.random() * 4 + 3;
                         HealthUi.style.width = player.health + "%";
                     } else kill();
@@ -824,23 +864,34 @@ function gameLoop(delta) {
     for (let i = 0; i < smartProjectileArray.length; i++) {
         const projectile = smartProjectileArray[i];
         projectile.update();
-        if (Math.random() < 0.3) {
-            emitParticle(projectile.x, projectile.y, 1, 2, projectile.color);
+        if (Math.random() < 0.4) {
+            emitParticle(
+                projectile.x,
+                projectile.y,
+                1,
+                2,
+                projectile.color,
+                -projectile.velX,
+                -projectile.velY
+            );
         }
-        if (projectile.lifeTime <= 0) {
-            projectile.markedForDeletion = true;
-        }
-
         //Player and smartProjectile Collision
-        if (!player.isDead) {
+        if (!player.isDead && projectile.color !== player.color) {
             const pDistance = Math.hypot(
                 projectile.x - player.x,
                 projectile.y - player.y
             );
             const pRadiiSum = projectile.size + player.size;
             if (pDistance <= pRadiiSum) {
-                emitParticle(player.x, player.y, 7, 9, player.color, projectile.velX,
-                    Projectile.velY);
+                emitParticle(
+                    player.x,
+                    player.y,
+                    7,
+                    9,
+                    player.color,
+                    projectile.velX,
+                    Projectile.velY
+                );
                 emitParticle(
                     projectile.x,
                     projectile.y,
@@ -860,6 +911,57 @@ function gameLoop(delta) {
             }
         }
 
+        //smartProjectile and Enemy Collision
+        for (let j = 0; j < enemyArray.length; j++) {
+            const enemy = enemyArray[j];
+            if (projectile.color === player.color) {
+                const Distance = Math.hypot(
+                    projectile.x - enemy.x,
+                    projectile.y - enemy.y
+                );
+                const RadiiSum = projectile.size + enemy.size;
+                if (Distance <= RadiiSum) {
+                    emitParticle(
+                        enemy.x,
+                        enemy.y,
+                        7,
+                        9,
+                        enemy.color,
+                        projectile.velX,
+                        Projectile.velY
+                    );
+                    emitParticle(
+                        projectile.x,
+                        projectile.y,
+                        12,
+                        15,
+                        projectile.color,
+                        projectile.velX,
+                        Projectile.velY
+                    );
+                    enemy.health -= Math.floor(Math.random() * 5 + 5);
+                    if (enemy.health > 0) {
+                        enemy.showHealth = true;
+                    } else {
+                        if (!enemy.isDead) {
+                            enemy.showHealth = false;
+                            enemy.isDead = true;
+                            playAudio(enemy_death, 0.5);
+                            score += Math.round(
+                                Math.random() * 10 + enemy.origSize
+                            );
+                            ScoreUi.innerText = String(score);
+                        }
+                    }
+                    playAudio(bullet_impact, 0.1);
+                    enemy.knock(projectile.velX * 0.5, projectile.velY * 0.5);
+                    projectile.markedForDeletion = true;
+                }
+            }
+        }
+        if (projectile.lifeTime <= 0) {
+            projectile.markedForDeletion = true;
+        }
         if (projectile.markedForDeletion) {
             smartProjectileArray.splice(i, 1);
             emitParticle(projectile.x, projectile.y, 8, 10, projectile.color);
@@ -871,9 +973,9 @@ function gameLoop(delta) {
         enemy.update();
         //enemyPassedBorders
         if (
-            enemy.x > CanvasWidth + enemy.size * 2 ||
+            enemy.x > WorldWidth + enemy.size * 2 ||
             enemy.x < -enemy.size * 2 ||
-            enemy.y > CanvasHeight + enemy.size * 2 ||
+            enemy.y > WorldHeight + enemy.size * 2 ||
             enemy.y < -enemy.size * 2
         ) {
             enemy.markedForDeletion = true;
@@ -887,7 +989,7 @@ function gameLoop(delta) {
                 enemy.origSize,
                 enemy.color
             );
-            
+
             enemyArray.splice(i, 1);
         }
     });
@@ -913,10 +1015,12 @@ function gameLoop(delta) {
         timer.update(timeElapsed);
     });
     
+    ctx.fillStyle = "white";
+    ctx.textAlign = "right";
     ctx.fillText(fps, canvas.width, 10);
-    
+
     //drawing Controls
-    
+
     ctx.lineWidth = 3;
     ctx.strokeStyle = "white";
     ctx.beginPath();
@@ -931,19 +1035,27 @@ function gameLoop(delta) {
     ctx.moveTo(aimControl.touchStartPositionX, aimControl.touchStartPositionY);
     ctx.lineTo(aimControl.touchEndPositionX, aimControl.touchEndPositionY);
     ctx.stroke();
-    
+
     requestAnimationFrame(gameLoop);
 }
+
+drawGrid();
 
 startBtn.addEventListener("click", () => {
     if (running) return;
     playAudio(button_click, 0.5);
     gameStart();
 });
+
 restartBtn.addEventListener("click", () => {
     if (running) return;
     playAudio(button_click, 0.5);
     gameStart();
+});
+
+controlTip.addEventListener('touchstart', () => {
+    controlTip.style.opacity = 0;
+    controlTip.style.visibility = "hidden";
 });
 
 canvas.addEventListener("touchstart", (ev) => {
@@ -1001,5 +1113,4 @@ window.addEventListener("resize", () => {
     canvas.height = window.innerHeight;
     WindowWidth = window.innerWidth;
     WindowHeight = window.innerHeight;
-
 });
